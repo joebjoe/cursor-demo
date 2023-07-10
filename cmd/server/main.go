@@ -48,6 +48,7 @@ func main() {
 	if err != nil {
 		e.Logger.Panicf("failed to connect to db: %v", err)
 	}
+	defer conn.Close()
 
 	if err := conn.Ping(context.Background()); err != nil {
 		e.Logger.Panicf("failed to test connection: %v", err)

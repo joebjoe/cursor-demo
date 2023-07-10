@@ -24,6 +24,7 @@ func main() {
 	if err != nil {
 		log.Panicf("failed to connect to db: %v", err)
 	}
+	defer conn.Close()
 
 	if err = seedDB(conn); err != nil {
 		log.Panic(err)
