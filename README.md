@@ -13,6 +13,7 @@ Playground for finding an intuitive pattern (both REST API + underlying db inter
 
 * `seed` - for populating the db
 * `server` - for starting the API server
+* `clean` - for destroying the docker db instance
 
 ## REST API
 
