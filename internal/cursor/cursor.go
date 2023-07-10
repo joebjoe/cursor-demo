@@ -17,11 +17,15 @@ const maxTTL = time.Minute * 20
 const maxPageSize = 500
 
 const (
-	// query used when route does not include the :cursor param; this has a static where clause,
-	// but no reason why could not be built from query params
+	// The query used for initiating the cursor.
+	//
+	// SCROLL - gives us the ability to go backwards; crucial because the first thing we do is
+	// advance to the end in order to get the total row count.
+	//
+	// WITH HOLD - gives us the ability to allow this cursor to be accessed/live on outside of
+	// the initiating transaction.
 	initCursorQuery = `DECLARE _%s SCROLL CURSOR WITH HOLD FOR %s`
 
-	// query to use when :cursor is found
 	fetchFromCursorQuery = `FETCH %d FROM _%s;`
 
 	moveForwardAll = `MOVE FORWARD ALL IN _%s;`
@@ -29,6 +33,7 @@ const (
 	moveBackwardAll = `MOVE ABSOLUTE 0 IN _%s;`
 )
 
+// This could be a separte interface as implemented here, or functionality of a greater Database interface.
 type Cursor interface {
 	io.Closer
 	Declare(ctx context.Context, curID string, sql string, args ...any) error
@@ -42,36 +47,16 @@ type cursor struct {
 	ttl  time.Duration
 }
 
-type Option func(*cursor)
-
 type fetchOp func(context.Context, any, int) (bool, error)
 
-func New(conn *pgxpool.Pool, opts ...Option) Cursor {
+func New(conn *pgxpool.Pool) Cursor {
 	c := &cursor{
 		conn: conn,
 		ttl:  maxTTL,
 		pool: map[string]fetchOp{},
 	}
 
-	for _, opt := range opts {
-		opt(c)
-	}
-
-	if c.ttl == 0 {
-		c.ttl = maxTTL
-	}
-
 	return c
-}
-
-func WithTTL(d time.Duration) func(c *cursor) {
-	return func(c *cursor) {
-		if d > maxTTL {
-			return
-		}
-
-		c.ttl = d
-	}
 }
 
 func (c *cursor) Close() (err error) {
@@ -89,11 +74,13 @@ func (c *cursor) Declare(ctx context.Context, rawCurID string, sql string, args 
 		return fmt.Errorf("invalid cursor id %q", rawCurID)
 	}
 
+	// create the cursor
 	_, err := c.conn.Exec(ctx, fmt.Sprintf(initCursorQuery, curID, sql), args...)
 	if err != nil {
 		return fmt.Errorf("failed to declare cursor: %w", err)
 	}
 
+	// advance to the end and read the total rows that exist for the cursor.
 	ct, err := c.conn.Exec(ctx, fmt.Sprintf(moveForwardAll, curID))
 	if err != nil {
 		return fmt.Errorf("failed to determine total for cursor: %w", err)
@@ -101,19 +88,24 @@ func (c *cursor) Declare(ctx context.Context, rawCurID string, sql string, args 
 
 	totalCount := ct.RowsAffected()
 
+	// reposition cursor back to the beginning
 	if _, err = c.conn.Exec(ctx, fmt.Sprintf(moveBackwardAll, curID)); err != nil {
 		return fmt.Errorf("failed to reset cursor: %w", err)
 	}
 
+	// set timer for cleaning up the cursor
 	go func() {
 		time.Sleep(c.ttl)
 
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second*30))
 		defer cancel()
 
+		delete(c.pool, curID)
 		c.conn.Exec(ctx, fmt.Sprintf("CLOSE %s;", curID))
 	}()
 
+	// add the fetch op to the pool so this cursor is accessible by following requests
+	// creating as anonymous function in order scope the `curID` and (most importantly) `totalCount` variables.
 	c.pool[curID] = func(ctx context.Context, dst any, pgSize int) (bool, error) {
 		rows, err := c.conn.Query(ctx, fmt.Sprintf(fetchFromCursorQuery, pgSize, curID))
 		if err != nil {
@@ -126,7 +118,14 @@ func (c *cursor) Declare(ctx context.Context, rawCurID string, sql string, args 
 
 		totalCount -= rows.CommandTag().RowsAffected()
 
-		return totalCount > 0, nil
+		more := totalCount > 0
+
+		if !more {
+			delete(c.pool, curID)
+			c.conn.Exec(ctx, fmt.Sprintf("CLOSE %s;", curID))
+		}
+
+		return more, nil
 	}
 
 	return nil
@@ -134,6 +133,10 @@ func (c *cursor) Declare(ctx context.Context, rawCurID string, sql string, args 
 
 func (c *cursor) Fetch(ctx context.Context, dst any, rawCurID string, pgSize int) (bool, error) {
 	curID := sanitizeCursorID(rawCurID)
+	if curID == "" {
+		return false, fmt.Errorf("invalid cursor id %q", rawCurID)
+	}
+
 	if pgSize == 0 || pgSize > maxPageSize {
 		pgSize = maxPageSize
 	}
