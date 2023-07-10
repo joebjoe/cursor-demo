@@ -1,0 +1,103 @@
+_type: export
+__export_format: 4
+__export_date: 2023-07-10T13:59:33.135Z
+__export_source: insomnia.desktop.app:v2022.7.5
+resources:
+  - _id: req_3e4bc84371c34bf58c4f2bc812291d2d
+    parentId: wrk_5334a63e801f4872b35ab272336f5924
+    modified: 1688996891193
+    created: 1688414601103
+    url: http://localhost:80/users
+    name: NewUserSearch
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_32576618ebec47bf822a60a5e9f6196c
+        name: id_match
+        value: "%2=0"
+        description: ""
+      - id: pair_e1d529d749fd433c9cfc6a37512d7703
+        name: page_size
+        value: "400"
+        description: ""
+    headers:
+      - id: pair_4cf53ae2e4bb434997432bd60b3cd603
+        name: Content-Type
+        value: text/plain
+        description: ""
+    authentication: {}
+    metaSortKey: -1688414601103
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: wrk_5334a63e801f4872b35ab272336f5924
+    parentId: null
+    modified: 1688414597304
+    created: 1688414597304
+    name: Cursor Demo
+    description: ""
+    scope: collection
+    _type: workspace
+  - _id: req_a78ff43024474aaf81fb8be9781ec8c8
+    parentId: wrk_5334a63e801f4872b35ab272336f5924
+    modified: 1688995689912
+    created: 1688480867003
+    url: http://localhost:80/users/{% response 'header',
+      'req_3e4bc84371c34bf58c4f2bc812291d2d', 'b64::WC1SZXF1ZXN0LUlk::46b',
+      'when-expired', 1200 %}
+    name: UserSearchWithCursor
+    description: ""
+    method: GET
+    body: {}
+    parameters:
+      - id: pair_56016ad256d8437e9b2e740d3892b9cd
+        name: page_size
+        value: "400"
+        description: ""
+    headers:
+      - id: pair_89aaff759d3541aeb049f4c59f95ff32
+        name: Content-Type
+        value: text/plain
+        description: ""
+    authentication: {}
+    metaSortKey: -1683363857898
+    isPrivate: false
+    settingStoreCookies: true
+    settingSendCookies: true
+    settingDisableRenderRequestBody: false
+    settingEncodeUrl: true
+    settingRebuildPath: true
+    settingFollowRedirects: global
+    _type: request
+  - _id: env_f4c0581843e9c687942f5de69aef4e7132850f39
+    parentId: wrk_5334a63e801f4872b35ab272336f5924
+    modified: 1688414597307
+    created: 1688414597307
+    name: Base Environment
+    data: {}
+    dataPropertyOrder: null
+    color: null
+    isPrivate: false
+    metaSortKey: 1688414597307
+    _type: environment
+  - _id: jar_f4c0581843e9c687942f5de69aef4e7132850f39
+    parentId: wrk_5334a63e801f4872b35ab272336f5924
+    modified: 1688414597308
+    created: 1688414597308
+    name: Default Jar
+    cookies: []
+    _type: cookie_jar
+  - _id: spc_43553c50779747bc98733f6bbcf59407
+    parentId: wrk_5334a63e801f4872b35ab272336f5924
+    modified: 1688414597305
+    created: 1688414597305
+    fileName: Cursor Demo
+    contents: ""
+    contentType: yaml
+    _type: api_spec
