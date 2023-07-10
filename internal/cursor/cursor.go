@@ -69,6 +69,9 @@ func (c *cursor) Close() (err error) {
 }
 
 func (c *cursor) Declare(ctx context.Context, rawCurID string, sql string, args ...any) error {
+	defer c.Unlock()
+	c.Lock()
+
 	curID := sanitizeCursorID(rawCurID)
 	if curID == "" {
 		return fmt.Errorf("invalid cursor id %q", rawCurID)
@@ -95,7 +98,10 @@ func (c *cursor) Declare(ctx context.Context, rawCurID string, sql string, args 
 
 	// set timer for cleaning up the cursor
 	go func() {
+		defer c.Unlock()
 		time.Sleep(c.ttl)
+
+		c.Lock()
 
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second*30))
 		defer cancel()
@@ -121,6 +127,9 @@ func (c *cursor) Declare(ctx context.Context, rawCurID string, sql string, args 
 		more := totalCount > 0
 
 		if !more {
+			defer c.Unlock()
+			c.Lock()
+
 			delete(c.pool, curID)
 			c.conn.Exec(ctx, fmt.Sprintf("CLOSE %s;", curID))
 		}
@@ -148,8 +157,6 @@ func (c *cursor) Fetch(ctx context.Context, dst any, rawCurID string, pgSize int
 
 	more, err := fetch(ctx, dst, pgSize)
 	if err != nil {
-		delete(c.pool, curID)
-
 		return false, fmt.Errorf("failed to fetch: %w", err)
 	}
 
